@@ -1,0 +1,46 @@
+import tensorflow as tf
+import keras
+import numpy as np
+import cv2
+from sklearn.model_selection import train_test_split
+
+from tensorflow.examples.tutorials.mnist import input_data 
+mnist=input_data.read_data_sets("C:/Praveen/MNIST_data/ubyte/", one_hot=True)
+
+images_test=mnist.test.images
+label_test=mnist.test.labels
+
+init_learning_rate = 1e-4
+total_epochs=20
+batch_size=100
+n_classes=10
+#print(images_train.shape)
+#print(label_train.shape)
+print(images_test.shape)
+print(label_test.shape)
+
+sess=tf.Session() 
+
+saver = tf.train.import_meta_graph('../Model_practice/model/mnist-19.meta')
+saver.restore(sess,tf.train.latest_checkpoint('../Model_practice/model'))													
+graph = tf.get_default_graph()
+
+x = tf.placeholder(tf.float32, [None, 784], name='x')
+y = tf.placeholder(tf.float32, [None, 10], name='y')
+test_feed_dict = { x: images_test,
+			       y: label_test
+				  }
+			
+y_pred = graph.get_tensor_by_name("y_pred:0")
+
+#Accuracy
+correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+#Loss
+cross_entropy = tf.reduce_mean(-tf.reduce_sum(y * tf.log(y_pred), reduction_indices=[1]))	
+
+# Running the test images
+test_accuracy , test_loss = sess.run([accuracy,cross_entropy],test_feed_dict)
+
+print( 'Test_Loss =',test_accuracy ,' & test_Accuracy =', test_loss)
