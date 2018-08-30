@@ -17,14 +17,7 @@ n_classes=10
 #print(images_train.shape)
 #print(label_train.shape)
 print(images_test.shape)
-print(label_test.shape)
-
- 
-												
-
-
-#x = tf.placeholder(tf.float32, [None, 784], name='x')
-#y = tf.placeholder(tf.float32, [None, 10], name='y')
+print(label_test.shape)				
 
 with tf.Session() as sess:	
 	saver = tf.train.import_meta_graph('../Model_practice/model/mnist-19.meta')
