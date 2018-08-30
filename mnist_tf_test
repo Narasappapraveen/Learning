@@ -19,28 +19,32 @@ n_classes=10
 print(images_test.shape)
 print(label_test.shape)
 
-sess=tf.Session() 
+ 
+												
 
-saver = tf.train.import_meta_graph('../Model_practice/model/mnist-19.meta')
-saver.restore(sess,tf.train.latest_checkpoint('../Model_practice/model'))													
-graph = tf.get_default_graph()
 
-x = tf.placeholder(tf.float32, [None, 784], name='x')
-y = tf.placeholder(tf.float32, [None, 10], name='y')
-test_feed_dict = { x: images_test,
+#x = tf.placeholder(tf.float32, [None, 784], name='x')
+#y = tf.placeholder(tf.float32, [None, 10], name='y')
+
+with tf.Session() as sess:	
+	saver = tf.train.import_meta_graph('../Model_practice/model/mnist-19.meta')
+	saver.restore(sess,tf.train.latest_checkpoint('../Model_practice/model'))	
+	
+	graph = tf.get_default_graph()
+	
+	x = graph.get_tensor_by_name("x:0")
+	y = graph.get_tensor_by_name("y:0")
+	test_feed_dict = { x: images_test,
 			       y: label_test
 				  }
 			
-y_pred = graph.get_tensor_by_name("y_pred:0")
+	y_pred = graph.get_tensor_by_name("y_pred:0")
 
-#Accuracy
-correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
-accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-
-#Loss
-cross_entropy = tf.reduce_mean(-tf.reduce_sum(y * tf.log(y_pred), reduction_indices=[1]))	
-
-# Running the test images
-test_accuracy , test_loss = sess.run([accuracy,cross_entropy],test_feed_dict)
-
-print( 'Test_Loss =',test_accuracy ,' & test_Accuracy =', test_loss)
+		#Accuracy
+	correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
+	accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+	#Loss
+	cross_entropy = tf.reduce_mean(-tf.reduce_sum(y * tf.log(y_pred), reduction_indices=[1]))
+	# Running the test images
+	test_accuracy , test_loss = sess.run([accuracy,cross_entropy],test_feed_dict)
+	print( 'Test_Loss =',test_loss ,' & test_Accuracy =', test_accuracy)
