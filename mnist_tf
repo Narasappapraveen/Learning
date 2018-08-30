@@ -1,0 +1,119 @@
+import tensorflow as tf
+import keras
+import numpy as np
+import cv2
+from sklearn.model_selection import train_test_split
+
+from tensorflow.examples.tutorials.mnist import input_data 
+mnist=input_data.read_data_sets("C:/Praveen/MNIST_data/ubyte/", one_hot=True)
+
+images_test=mnist.test.images
+label_test=mnist.test.labels
+
+init_learning_rate = 1e-4
+total_epochs=20
+batch_size=100
+n_classes=10
+#print(images_train.shape)
+#print(label_train.shape)
+#print(images_test.shape)
+#print(label_test.shape)
+
+Img_train, Img_val, Label_train, Label_val = train_test_split(mnist.train.images,
+                                                    mnist.train.labels,
+                                                    test_size=0.25,
+                                                    random_state=42)
+													
+#print(X_train.shape)
+#print(X_val.shape)
+#print(Y_train.shape)
+#print(Y_val.shape)
+
+def mnist_model(x_dict):
+	with tf.variable_scope('ConvNet'):
+		x=x_dict
+		x=tf.reshape(x, shape=[-1,28,28,1])
+		conv1=tf.layers.conv2d(x,32,5,activation=tf.nn.relu,name='conv1')
+		conv1=tf.layers.max_pooling2d(conv1,2,2,name='Max_pool1')
+		
+		conv2=tf.layers.conv2d(conv1,64,3,activation=tf.nn.relu,name='conv2')
+		conv2=tf.layers.max_pooling2d(conv2,2,2,name='Max_pool2')
+		
+		fc1=tf.contrib.layers.flatten(conv2)
+		fc1=tf.layers.dense(fc1,1024,name='FC1')
+	#	fc1=tf.layers.dropout(fc1,rate=dropout,training=is_training)
+		
+		# Output layer, class prediction
+		out=tf.layers.dense(fc1,n_classes,name='FC2')
+		
+	return out
+
+# cross-entropy loss function (= -sum(Y_i * log(Yi)) ), normalised for batches of 100  images
+# TensorFlow provides the softmax_cross_entropy_with_logits function to avoid numerical stability
+# problems with log(0) which is NaN
+# Input layer
+x = tf.placeholder(tf.float32, [None, 784], name='x')
+y = tf.placeholder(tf.float32, [None, 10], name='y')
+learning_rate = tf.placeholder(tf.float32, name='learning_rate')
+
+out = mnist_model(x);
+y_pred = tf.nn.softmax(out, name='y_pred') #converts score to probabilites
+with tf.variable_scope('Loss'):
+	# Evaluation functions
+	cross_entropy = tf.reduce_mean(-tf.reduce_sum(y * tf.log(y_pred), reduction_indices=[1]))	
+
+# Training algorithm
+train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy)	
+
+with tf.variable_scope('Accuracy'):
+	correct_prediction = tf.equal(tf.argmax(y_pred, 1), tf.argmax(y, 1))
+	accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))	
+
+tf.summary.scalar('loss', cross_entropy)
+tf.summary.scalar('accuracy', accuracy)
+saver = tf.train.Saver(tf.global_variables())		
+
+with tf.Session() as sess:
+	ckpt = tf.train.get_checkpoint_state('../Model_practice/model')
+	if ckpt and tf.train.checkpoint_exists(ckpt.model_checkpoint_path):
+		saver.restore(sess, ckpt.model_checkpoint_path)
+	else:
+		sess.run(tf.global_variables_initializer())
+	
+	merged = tf.summary.merge_all()
+	writer = tf.summary.FileWriter('../Model_practice/logs', sess.graph)
+	
+	global_step = 0
+	epoch_learning_rate = init_learning_rate
+	total_train_images = Img_train.shape
+	total_batch = int(total_train_images[0]/batch_size)
+	for epoch in range(total_epochs):
+		if epoch == (total_epochs * 0.5) or epoch == (total_epochs * 0.75):
+			epoch_learning_rate = epoch_learning_rate / 10
+		
+		loss=0.0
+		for step in range(total_batch):
+			start = step * batch_size
+			end  = start + batch_size
+			train_feed_dict = { x: Img_train[start:end],
+								y: Label_train[start:end],
+								learning_rate: epoch_learning_rate
+							}
+			_, loss = sess.run([train_step, cross_entropy], feed_dict=train_feed_dict)
+			
+		train_summary, train_accuracy = sess.run([merged, accuracy], feed_dict=train_feed_dict)
+		# accuracy.eval(feed_dict=feed_dict)
+		#print("Step:", step, "Loss:", loss, "Training accuracy:", train_accuracy)		
+		print('Epoch:', '%04d' % (epoch + 1))
+		print("Train_Loss:", loss," & Training accuracy:", train_accuracy)
+		writer.add_summary(train_summary, global_step=epoch)
+		#Testing after epoch		
+		test_feed_dict = {
+             x: Img_val,
+             y: Label_val,
+             learning_rate: epoch_learning_rate,        
+				}
+				
+		val_accuracy, val_loss = sess.run([accuracy,cross_entropy], feed_dict=test_feed_dict)
+		print( 'Val_Loss =',val_loss ,' & Val_Accuracy =', val_accuracy)
+	saver.save(sess=sess, save_path='../Model_practice/model/mnist',global_step=epoch)	
