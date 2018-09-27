@@ -9,11 +9,11 @@ from sklearn.utils import shuffle
 import csv
 import os
 import tensorflow as tf
-from tensorflow.contrib.layers import flatten
+from tensorflow.contrib.layers import flatten,conv2d
 from sklearn.metrics import confusion_matrix
 import pdb
 
-from VGGnet_16 import VGGnet,VGGnet_16
+from VGGnet_16 import VGGnet , VGGnet_16
 
 #Loading the data
 training_file   = 'C:/Praveen/TSR/traffic_sign_classification_german-master/train.p'
@@ -78,21 +78,30 @@ def preprocess(data):
 		normalized_images[i] = image_normalize(img)
 	normalized_images = normalized_images[..., None]
 	return normalized_images
-
+	
+def adam_variables_initializer(adam_opt, var_list):
+    adam_vars = [adam_opt.get_slot(var, name)
+                 for name in adam_opt.get_slot_names()
+                 for var in var_list if adam_opt.get_slot(var, name) is not None]
+    adam_vars.extend(list(adam_opt._get_beta_accumulators()))
+    return tf.variables_initializer(adam_vars)
 
 # Training set preprocessing
 normalized_images = preprocess(x_train)
+x_valid_preprocessed = preprocess(x_valid)
 
-
+model_name = "VGGNet" 
 EPOCHS = 30
 BATCH_SIZE = 200
 learning_rate=0.001
 DIR	    = 'C:/Praveen/TSR/traffic_sign_classification_german-master/Saved_Models/VGGNet16_TL/'
 Log_dir = 'C:/Praveen/TSR/traffic_sign_classification_german-master/VGGNet16_TL_logs/'
 
+tf.reset_default_graph()
+new_graph = tf.Graph()
 # Test set preprocessing
 #x_test_preprocessed = preprocess(x_test)
-with tf.Session() as sess:
+with tf.Session(graph=new_graph) as sess:
     # saver = tf.train.import_meta_graph('../TSR/traffic_sign_classification_german-master/Saved_Models/VGGNet.meta')
     # saver.restore(sess,tf.train.latest_checkpoint('../TSR/traffic_sign_classification_german-master/Saved_Models'))	
 
@@ -137,18 +146,19 @@ with tf.Session() as sess:
     trainable_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "trainable_section")
 
     one_hot_y = tf.one_hot(y, n_classes)
-    with tf.variable_scope('Cost_function'):		
+    with tf.variable_scope('Cost_function1'):		
         # Training operation
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits =logits_NL, labels=one_hot_y )
         loss_operation = tf.reduce_mean(cross_entropy, name='loss')
         optimizer = tf.train.AdamOptimizer(learning_rate = learning_rate)
         training_operation = optimizer.minimize(loss_operation, var_list=trainable_vars )
-    with tf.variable_scope('Accuracy'):	
+    with tf.variable_scope('Accuracy1'):	
         # Accuracy operation
         correct_prediction = tf.equal(tf.argmax(logits_NL, 1), tf.argmax(one_hot_y, 1))
         accuracy_operation = tf.reduce_mean(tf.cast(correct_prediction, tf.float32),name='accuracy')
-
-    saver = tf.train.Saver(tf.global_variables())
+		
+    #pdb.set_trace()
+    saver = tf.train.Saver()
     prev_accuracy = 0
 
     #Summary writers
@@ -157,7 +167,11 @@ with tf.Session() as sess:
 
     trainable_variable_initializers = [var.initializer for var in trainable_vars]
     sess.run(trainable_variable_initializers)
-    sess.run(tf.variables_initializer(optimizer.variables()))
+    reset_opt_vars = adam_variables_initializer(optimizer, trainable_vars)
+    #momentum_initializers = [var for var in tf.global_variables() if 'Momentum' in var.name]
+    #var_list_init = tf.variables_initializer(momentum_initializers)
+    sess.run(reset_opt_vars)
+    #sess.run(tf.variables_initializer(optimizer.variables()))
     num_examples = len(y_train)
     print("Training...")
     print()
@@ -171,12 +185,12 @@ with tf.Session() as sess:
             _,training_loss, training_accuracy = sess.run([training_operation, loss_operation , accuracy_operation],feed_dict={x: batch_x, y: batch_y, keep_prob : 0.5, keep_prob_conv: 0.7})
             train_accuracy += (training_accuracy * len(batch_x) )
             train_loss	   += (training_loss * len(batch_x) )
-            print(offset)
+            
         #pdb.set_trace() 
         train_accuracy = train_accuracy/ num_examples
         train_loss = train_loss / num_examples
-        print(train_accuracy)
-        print(train_loss)
+        print("EPOCH {} : Training Accuracy = {:.3f}%".format(i+1, (train_accuracy*100)))
+        print('		Training Loss = %f' % train_loss)
         # Training summary
         Train_acc = tf.Summary(value=[ tf.Summary.Value(tag="train_accuracy", simple_value=train_accuracy)])
         Train_loss = tf.Summary(value=[ tf.Summary.Value(tag="train_loss", simple_value=train_loss)])
@@ -193,18 +207,18 @@ with tf.Session() as sess:
         #val_acc  = tf.summary.scalar('Val_accuracy', valid_accuracy)
         #Valid_summary = tf.summary.merge([val_acc,val_loss])
         writer_test.add_summary(Vald_acc, global_step=i)
-        writer_test.add_summary(Vald_loss, global_step=i)		
+        writer_test.add_summary(Vald_loss, global_step=i)
         writer_test.flush()
 
-        print("EPOCH {} : Validation Accuracy = {:.3f}%".format(i+1, (valid_accuracy*100)))
+        print("     Validation Accuracy = {:.3f}%".format(valid_accuracy*100))
         print('		Validation Loss = %f' % valid_loss)
         if valid_accuracy > prev_accuracy:
             saver.save(sess = sess, save_path = os.path.join(DIR, model_name))
             prev_accuracy = valid_accuracy
     print("Model saved")
+   
 
-
-
-
-
-
+	
+	
+	
+	
